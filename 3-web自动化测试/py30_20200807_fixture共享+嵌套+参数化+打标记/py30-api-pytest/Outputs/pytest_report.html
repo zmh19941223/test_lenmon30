@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Test Report</title>
+    <link href="assets/style.css" rel="stylesheet" type="text/css"/></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function find_all(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sort_column(elem) {
+    toggle_sort_states(elem);
+    var colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    var key;
+    if (elem.classList.contains('numeric')) {
+        key = key_num;
+    } else if (elem.classList.contains('result')) {
+        key = key_result;
+    } else {
+        key = key_alpha;
+    }
+    sort_table(elem, key(colIndex));
+}
+
+function show_all_extras() {
+    find_all('.col-result').forEach(show_extras);
+}
+
+function hide_all_extras() {
+    find_all('.col-result').forEach(hide_extras);
+}
+
+function show_extras(colresult_elem) {
+    var extras = colresult_elem.parentNode.nextElementSibling;
+    var expandcollapse = colresult_elem.firstElementChild;
+    extras.classList.remove("collapsed");
+    expandcollapse.classList.remove("expander");
+    expandcollapse.classList.add("collapser");
+}
+
+function hide_extras(colresult_elem) {
+    var extras = colresult_elem.parentNode.nextElementSibling;
+    var expandcollapse = colresult_elem.firstElementChild;
+    extras.classList.add("collapsed");
+    expandcollapse.classList.remove("collapser");
+    expandcollapse.classList.add("expander");
+}
+
+function show_filters() {
+    var filter_items = document.getElementsByClassName('filter');
+    for (var i = 0; i < filter_items.length; i++)
+        filter_items[i].hidden = false;
+}
+
+function add_collapse() {
+    // Add links for show/hide all
+    var resulttable = find('table#results-table');
+    var showhideall = document.createElement("p");
+    showhideall.innerHTML = '<a href="javascript:show_all_extras()">Show all details</a> / ' +
+                            '<a href="javascript:hide_all_extras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    find_all('.col-result').forEach(function(elem) {
+        var collapsed = get_query_parameter('collapsed') || 'Passed';
+        var extras = elem.parentNode.nextElementSibling;
+        var expandcollapse = document.createElement("span");
+        if (extras.classList.contains("collapsed")) {
+            expandcollapse.classList.add("expander")
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add("collapsed");
+            expandcollapse.classList.add("expander");
+        } else {
+            expandcollapse.classList.add("collapser");
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener("click", function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains("collapsed")) {
+                show_extras(event.currentTarget);
+            } else {
+                hide_extras(event.currentTarget);
+            }
+        });
+    })
+}
+
+function get_query_parameter(name) {
+    var match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () {
+    reset_sort_headers();
+
+    add_collapse();
+
+    show_filters();
+
+    sort_column(find('.initial-sort'));
+
+    find_all('.sortable').forEach(function(elem) {
+        elem.addEventListener("click",
+                              function(event) {
+                                  sort_column(elem);
+                              }, false)
+    });
+
+};
+
+function sort_table(clicked, key_func) {
+    var rows = find_all('.results-table-row');
+    var reversed = !clicked.classList.contains('asc');
+    var sorted_rows = sort(rows, key_func, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    var thead = document.getElementById("results-table-head");
+    document.getElementById('results-table').remove();
+    var parent = document.createElement("table");
+    parent.id = "results-table";
+    parent.appendChild(thead);
+    sorted_rows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName("BODY")[0].appendChild(parent);
+}
+
+function sort(items, key_func, reversed) {
+    var sort_array = items.map(function(item, i) {
+        return [key_func(item), i];
+    });
+
+    sort_array.sort(function(a, b) {
+        var key_a = a[0];
+        var key_b = b[0];
+
+        if (key_a == key_b) return 0;
+
+        if (reversed) {
+            return (key_a < key_b ? 1 : -1);
+        } else {
+            return (key_a > key_b ? 1 : -1);
+        }
+    });
+
+    return sort_array.map(function(item) {
+        var index = item[1];
+        return items[index];
+    });
+}
+
+function key_alpha(col_index) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[col_index].firstChild.data.toLowerCase();
+    };
+}
+
+function key_num(col_index) {
+    return function(elem) {
+        return parseFloat(elem.childNodes[1].childNodes[col_index].firstChild.data);
+    };
+}
+
+function key_result(col_index) {
+    return function(elem) {
+        var strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+                       'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[col_index].firstChild.data);
+    };
+}
+
+function reset_sort_headers() {
+    find_all('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    find_all('.sortable').forEach(function(elem) {
+        var icon = document.createElement("div");
+        icon.className = "sort-icon";
+        icon.textContent = "vvv";
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove("desc", "active");
+        elem.classList.add("asc", "inactive");
+    });
+}
+
+function toggle_sort_states(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        reset_sort_headers();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function is_all_rows_hidden(value) {
+  return value.hidden == false;
+}
+
+function filter_table(elem) {
+    var outcome_att = "data-test-result";
+    var outcome = elem.getAttribute(outcome_att);
+    class_outcome = outcome + " results-table-row";
+    var outcome_rows = document.getElementsByClassName(class_outcome);
+
+    for(var i = 0; i < outcome_rows.length; i++){
+        outcome_rows[i].hidden = !elem.checked;
+    }
+
+    var rows = find_all('.results-table-row').filter(is_all_rows_hidden);
+    var all_rows_hidden = rows.length == 0 ? true : false;
+    var not_found_message = document.getElementById("not-found-message");
+    not_found_message.hidden = !all_rows_hidden;
+}
+</script>
+    <h1>pytest_report.html</h1>
+    <p>Report generated on 07-Aug-2020 at 21:38:52 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v2.1.1</p>
+    <h2>Environment</h2>
+    <table id="environment">
+      <tr>
+        <td>JAVA_HOME</td>
+        <td>C:\Program Files\Java\jdk-11.0.4</td></tr>
+      <tr>
+        <td>Packages</td>
+        <td>{"pluggy": "0.12.0", "py": "1.8.0", "pytest": "5.4.1"}</td></tr>
+      <tr>
+        <td>Platform</td>
+        <td>Windows-10-10.0.18362-SP0</td></tr>
+      <tr>
+        <td>Plugins</td>
+        <td>{"allure-pytest": "2.8.13", "html": "2.1.1", "metadata": "1.8.0", "rerunfailures": "9.0"}</td></tr>
+      <tr>
+        <td>Python</td>
+        <td>3.7.2</td></tr></table>
+    <h2>Summary</h2>
+    <p>16 tests ran in 6.97 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="passed">16 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="failed">0 failed</span>, <input checked="true" class="filter" data-test-result="error" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="error">0 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>, <input checked="true" class="filter" data-test-result="rerun" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="rerun">0 rerun</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable numeric" col="duration">Duration</th>
+          <th>Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_add.py::TestAdd::test_add[case0]</td>
+          <td class="col-duration">0.12</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stderr setup------------------------------ <br/>2020-08-07 21:38:50,335 py30 INFO conftest.py-18 line：************** 接口 开始测试 ************
+<br/> ------------------------------Captured stdout call------------------------------ <br/>13234825738
+123456789
+<br/> ------------------------------Captured stderr call------------------------------ <br/>2020-08-07 21:38:50,345 py30 INFO handle_data.py-44 line：正则表达式替换完成之后的请求数据：
+{&#x27;case_id&#x27;: None, &#x27;type&#x27;: &#x27;before&#x27;, &#x27;interface&#x27;: &#x27;login&#x27;, &#x27;title&#x27;: &#x27;前置操作 - 管理员登陆&#x27;, &#x27;method&#x27;: &#x27;post&#x27;, &#x27;url&#x27;: &#x27;/member/login&#x27;, &#x27;request_data&#x27;: &#x27;{&quot;mobile_phone&quot;:&quot;13234825738&quot;,&quot;pwd&quot;:&quot;123456789&quot;}&#x27;, &#x27;extract_data&#x27;: &#x27;{&quot;admin_member_id&quot;:&quot;$..id&quot;,&quot;token&quot;:&quot;$..token&quot;}&#x27;, &#x27;expected&#x27;: None, &#x27;check_sql&#x27;: None}
+2020-08-07 21:38:50,345 py30 INFO handle_requests.py-33 line：发起一次HTTP请求
+2020-08-07 21:38:50,346 py30 INFO handle_requests.py-41 line：请求头为：{&#x27;X-Lemonban-Media-Type&#x27;: &#x27;lemonban.v3&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json&#x27;}
+2020-08-07 21:38:50,353 py30 INFO handle_requests.py-42 line：请求方法为：post
+2020-08-07 21:38:50,354 py30 INFO handle_requests.py-43 line：请求url为：http://api.lemonban.com/futureloan/member/login
+2020-08-07 21:38:50,354 py30 INFO handle_requests.py-44 line：请求数据为：{&#x27;mobile_phone&#x27;: &#x27;13234825738&#x27;, &#x27;pwd&#x27;: &#x27;123456789&#x27;}
+2020-08-07 21:38:50,462 py30 INFO handle_requests.py-51 line：响应状态码为：200
+2020-08-07 21:38:50,463 py30 INFO handle_requests.py-52 line：响应数据为：{&#x27;code&#x27;: 0, &#x27;msg&#x27;: &#x27;OK&#x27;, &#x27;data&#x27;: {&#x27;id&#x27;: 983, &#x27;leave_amount&#x27;: 35998.08, &#x27;mobile_phone&#x27;: &#x27;13234825738&#x27;, &#x27;reg_name&#x27;: &#x27;美丽可爱的小简&#x27;, &#x27;reg_time&#x27;: &#x27;2020-07-17 21:43:20.0&#x27;, &#x27;type&#x27;: 0, &#x27;token_info&#x27;: {&#x27;token_type&#x27;: &#x27;Bearer&#x27;, &#x27;expires_in&#x27;: &#x27;2020-08-07 21:43:51&#x27;, &#x27;token&#x27;: &#x27;eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwIjoxNTk2ODA3ODMxfQ.mmXatd-bdN5Ox7ajYc9RcBFJpwf-FJMPV5wiGmqExsOpLTEVRWyYyMTVenIFop9mRhqhpcusJuuc1U56CeO_ig&#x27;}}, &#x27;copyright&#x27;: &#x27;Copyright 柠檬班 © 2017-2020 湖南省零檬信息技术有限公司 All Rights Reserved&#x27;}
+2020-08-07 21:38:50,463 py30 INFO handle_extract_data_from_response.py-23 line：要从响应结果当中提取的数据集为：
+{&#x27;admin_member_id&#x27;: &#x27;$..id&#x27;, &#x27;token&#x27;: &#x27;$..token&#x27;}
+2020-08-07 21:38:50,464 py30 INFO handle_extract_data_from_response.py-29 line：设置环境变量.key:admin_member_id,value:983
+2020-08-07 21:38:50,464 py30 INFO handle_extract_data_from_response.py-29 line：设置环境变量.key:token,value:eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwIjoxNTk2ODA3ODMxfQ.mmXatd-bdN5Ox7ajYc9RcBFJpwf-FJMPV5wiGmqExsOpLTEVRWyYyMTVenIFop9mRhqhpcusJuuc1U56CeO_ig
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_add.py::TestAdd::test_add[case1]</td>
+          <td class="col-duration">0.35</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>983
+983
+eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwI1596807530
+<br/> ------------------------------Captured stderr call------------------------------ <br/>2020-08-07 21:38:50,483 py30 INFO handle_data.py-44 line：正则表达式替换完成之后的请求数据：
+{&#x27;case_id&#x27;: 1, &#x27;type&#x27;: &#x27;case&#x27;, &#x27;interface&#x27;: &#x27;add&#x27;, &#x27;title&#x27;: &#x27;加标成功&#x27;, &#x27;method&#x27;: &#x27;post&#x27;, &#x27;url&#x27;: &#x27;/loan/add&#x27;, &#x27;request_data&#x27;: &#x27;{&quot;member_id&quot;:983,&quot;title&quot;:&quot;借钱实现财富自由&quot;,&quot;amount&quot;:2000,&quot;loan_rate&quot;:12.0,&quot;loan_term&quot;:3,&quot;loan_date_type&quot;:1,&quot;bidding_days&quot;:5}&#x27;, &#x27;extract_data&#x27;: None, &#x27;expected&#x27;: &#x27;{&quot;code&quot;:0,&quot;msg&quot;:&quot;OK&quot;}&#x27;, &#x27;check_sql&#x27;: &#x27;SELECT * FROM  futureloan.loan WHERE member_id=983;&#x27;}
+2020-08-07 21:38:50,484 py30 INFO handle_requests.py-33 line：发起一次HTTP请求
+2020-08-07 21:38:50,569 py30 INFO handle_requests.py-41 line：请求头为：{&#x27;X-Lemonban-Media-Type&#x27;: &#x27;lemonban.v3&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json&#x27;, &#x27;Authorization&#x27;: &#x27;Bearer eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwIjoxNTk2ODA3ODMxfQ.mmXatd-bdN5Ox7ajYc9RcBFJpwf-FJMPV5wiGmqExsOpLTEVRWyYyMTVenIFop9mRhqhpcusJuuc1U56CeO_ig&#x27;}
+2020-08-07 21:38:50,569 py30 INFO handle_requests.py-42 line：请求方法为：post
+2020-08-07 21:38:50,570 py30 INFO handle_requests.py-43 line：请求url为：http://api.lemonban.com/futureloan/loan/add
+2020-08-07 21:38:50,570 py30 INFO handle_requests.py-44 line：请求数据为：{&#x27;member_id&#x27;: 983, &#x27;title&#x27;: &#x27;借钱实现财富自由&#x27;, &#x27;amount&#x27;: 2000, &#x27;loan_rate&#x27;: 12.0, &#x27;loan_term&#x27;: 3, &#x27;loan_date_type&#x27;: 1, &#x27;bidding_days&#x27;: 5, &#x27;sign&#x27;: &#x27;IYySSvAVc0pe2NwW3hLsiL6l5+h+QfeX6P/ghSKCMXcWUBmWmWgBywIdC0Bnt554pZzylbJIvTWL9OSODvnvsLfHDT/afE+qfRGjnU3FdQsjSRO1E/GjwQyqiS5aD2WzSRz1WKRgNtDM3jIRmGwRaN0RXojTyvjDxqFJmwtLiD4=&#x27;, &#x27;timestamp&#x27;: 1596807530}
+2020-08-07 21:38:50,629 py30 INFO handle_requests.py-51 line：响应状态码为：200
+2020-08-07 21:38:50,629 py30 INFO handle_requests.py-52 line：响应数据为：{&#x27;code&#x27;: 0, &#x27;msg&#x27;: &#x27;OK&#x27;, &#x27;data&#x27;: {&#x27;id&#x27;: 201212, &#x27;member_id&#x27;: 983, &#x27;title&#x27;: &#x27;借钱实现财富自由&#x27;, &#x27;amount&#x27;: 2000.0, &#x27;loan_rate&#x27;: 12.0, &#x27;loan_term&#x27;: 3, &#x27;loan_date_type&#x27;: 1, &#x27;bidding_days&#x27;: 5, &#x27;create_time&#x27;: &#x27;2020-08-07 21:38:51.0&#x27;, &#x27;bidding_start_time&#x27;: None, &#x27;full_time&#x27;: None, &#x27;status&#x27;: 1}, &#x27;copyright&#x27;: &#x27;Copyright 柠檬班 © 2017-2020 湖南省零檬信息技术有限公司 All Rights Reserved&#x27;}
+2020-08-07 21:38:50,811 py30 INFO test_add.py-52 line：数据库查询结果为：
+2020-08-07 21:38:50,814 py30 INFO test_add.py-53 line：{&#x27;id&#x27;: 1090, &#x27;member_id&#x27;: 983, &#x27;title&#x27;: &#x27;借钱实现财富自由&#x27;, &#x27;amount&#x27;: Decimal(&#x27;2000.00&#x27;), &#x27;loan_rate&#x27;: Decimal(&#x27;12.0&#x27;), &#x27;loan_term&#x27;: 3, &#x27;loan_date_type&#x27;: 1, &#x27;bidding_days&#x27;: 5, &#x27;create_time&#x27;: datetime.datetime(2020, 7, 19, 10, 56, 7), &#x27;bidding_start_time&#x27;: datetime.datetime(2020, 7, 21, 15, 59, 45), &#x27;full_time&#x27;: None, &#x27;status&#x27;: 2}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_add.py::TestAdd::test_add[case2]</td>
+          <td class="col-duration">0.08</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwI1596807530
+<br/> ------------------------------Captured stderr call------------------------------ <br/>2020-08-07 21:38:50,835 py30 INFO handle_data.py-44 line：正则表达式替换完成之后的请求数据：
+{&#x27;case_id&#x27;: 2, &#x27;type&#x27;: &#x27;case&#x27;, &#x27;interface&#x27;: &#x27;add&#x27;, &#x27;title&#x27;: &#x27;加标失败—借款人id为空&#x27;, &#x27;method&#x27;: &#x27;post&#x27;, &#x27;url&#x27;: &#x27;/loan/add&#x27;, &#x27;request_data&#x27;: &#x27;{&quot;title&quot;:&quot;借钱实现财富自由&quot;,&quot;amount&quot;:2000,&quot;loan_rate&quot;:12.0,&quot;loan_term&quot;:3,&quot;loan_date_type&quot;:1,&quot;bidding_days&quot;:5}&#x27;, &#x27;extract_data&#x27;: None, &#x27;expected&#x27;: &#x27;{&quot;code&quot;:1,&quot;msg&quot;:&quot;用户id为空&quot;}&#x27;, &#x27;check_sql&#x27;: None}
+2020-08-07 21:38:50,836 py30 INFO handle_requests.py-33 line：发起一次HTTP请求
+2020-08-07 21:38:50,841 py30 INFO handle_requests.py-41 line：请求头为：{&#x27;X-Lemonban-Media-Type&#x27;: &#x27;lemonban.v3&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json&#x27;, &#x27;Authorization&#x27;: &#x27;Bearer eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwIjoxNTk2ODA3ODMxfQ.mmXatd-bdN5Ox7ajYc9RcBFJpwf-FJMPV5wiGmqExsOpLTEVRWyYyMTVenIFop9mRhqhpcusJuuc1U56CeO_ig&#x27;}
+2020-08-07 21:38:50,842 py30 INFO handle_requests.py-42 line：请求方法为：post
+2020-08-07 21:38:50,842 py30 INFO handle_requests.py-43 line：请求url为：http://api.lemonban.com/futureloan/loan/add
+2020-08-07 21:38:50,842 py30 INFO handle_requests.py-44 line：请求数据为：{&#x27;title&#x27;: &#x27;借钱实现财富自由&#x27;, &#x27;amount&#x27;: 2000, &#x27;loan_rate&#x27;: 12.0, &#x27;loan_term&#x27;: 3, &#x27;loan_date_type&#x27;: 1, &#x27;bidding_days&#x27;: 5, &#x27;sign&#x27;: &#x27;t7G8wfFgzprJdMnjwLRCcMYIT6p25WRniHbk24HS79qcF3IYZ9FlRCq2ERUzhL1svR4HiNP5Tax+AP/yZZyDU5JQVVh7fXOzshU6MaEvMRwiux2sKUK/urYb02JIErvm5XblWLTyDYJc0t7QYjgy8jr4E14nrsVFOoQYvgpE8sY=&#x27;, &#x27;timestamp&#x27;: 1596807530}
+2020-08-07 21:38:50,913 py30 INFO handle_requests.py-51 line：响应状态码为：200
+2020-08-07 21:38:50,915 py30 INFO handle_requests.py-52 line：响应数据为：{&#x27;code&#x27;: 1, &#x27;msg&#x27;: &#x27;用户id为空&#x27;, &#x27;data&#x27;: None, &#x27;copyright&#x27;: &#x27;Copyright 柠檬班 © 2017-2020 湖南省零檬信息技术有限公司 All Rights Reserved&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_add.py::TestAdd::test_add[case3]</td>
+          <td class="col-duration">0.07</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>983
+eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwI1596807530
+<br/> ------------------------------Captured stderr call------------------------------ <br/>2020-08-07 21:38:50,927 py30 INFO handle_data.py-44 line：正则表达式替换完成之后的请求数据：
+{&#x27;case_id&#x27;: 3, &#x27;type&#x27;: &#x27;case&#x27;, &#x27;interface&#x27;: &#x27;add&#x27;, &#x27;title&#x27;: &#x27;加标失败—标题为空&#x27;, &#x27;method&#x27;: &#x27;post&#x27;, &#x27;url&#x27;: &#x27;/loan/add&#x27;, &#x27;request_data&#x27;: &#x27;{&quot;member_id&quot;:983,&quot;amount&quot;:2000,&quot;loan_rate&quot;:12.0,&quot;loan_term&quot;:3,&quot;loan_date_type&quot;:1,&quot;bidding_days&quot;:5}&#x27;, &#x27;extract_data&#x27;: None, &#x27;expected&#x27;: &#x27;{&quot;code&quot;:1,&quot;msg&quot;:&quot;标题为空&quot;}&#x27;, &#x27;check_sql&#x27;: None}
+2020-08-07 21:38:50,928 py30 INFO handle_requests.py-33 line：发起一次HTTP请求
+2020-08-07 21:38:50,929 py30 INFO handle_requests.py-41 line：请求头为：{&#x27;X-Lemonban-Media-Type&#x27;: &#x27;lemonban.v3&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json&#x27;, &#x27;Authorization&#x27;: &#x27;Bearer eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwIjoxNTk2ODA3ODMxfQ.mmXatd-bdN5Ox7ajYc9RcBFJpwf-FJMPV5wiGmqExsOpLTEVRWyYyMTVenIFop9mRhqhpcusJuuc1U56CeO_ig&#x27;}
+2020-08-07 21:38:50,929 py30 INFO handle_requests.py-42 line：请求方法为：post
+2020-08-07 21:38:50,930 py30 INFO handle_requests.py-43 line：请求url为：http://api.lemonban.com/futureloan/loan/add
+2020-08-07 21:38:50,930 py30 INFO handle_requests.py-44 line：请求数据为：{&#x27;member_id&#x27;: 983, &#x27;amount&#x27;: 2000, &#x27;loan_rate&#x27;: 12.0, &#x27;loan_term&#x27;: 3, &#x27;loan_date_type&#x27;: 1, &#x27;bidding_days&#x27;: 5, &#x27;sign&#x27;: &#x27;tXaBoqRJ4cgUcO4muIh2qK3LTCigoSMoIM4qOW2kikpoy7Mb6nnUDtB2xE14P3u1bsRf2D41J2TXIYc8fptjkDe+H50hg4KNZ7oeenQ8R4SqZ4A8mUcviaiBvhBRMDovX5tHQO2S982VIQaZJ4HKBV0GXwCCDdG6Z0iDmAoAupg=&#x27;, &#x27;timestamp&#x27;: 1596807530}
+2020-08-07 21:38:50,996 py30 INFO handle_requests.py-51 line：响应状态码为：200
+2020-08-07 21:38:50,997 py30 INFO handle_requests.py-52 line：响应数据为：{&#x27;code&#x27;: 1, &#x27;msg&#x27;: &#x27;标题为空&#x27;, &#x27;data&#x27;: None, &#x27;copyright&#x27;: &#x27;Copyright 柠檬班 © 2017-2020 湖南省零檬信息技术有限公司 All Rights Reserved&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_add.py::TestAdd::test_add[case4]</td>
+          <td class="col-duration">0.09</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>983
+eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwI1596807531
+<br/> ------------------------------Captured stderr call------------------------------ <br/>2020-08-07 21:38:51,006 py30 INFO handle_data.py-44 line：正则表达式替换完成之后的请求数据：
+{&#x27;case_id&#x27;: 4, &#x27;type&#x27;: &#x27;case&#x27;, &#x27;interface&#x27;: &#x27;add&#x27;, &#x27;title&#x27;: &#x27;加标失败—借款金额为空&#x27;, &#x27;method&#x27;: &#x27;post&#x27;, &#x27;url&#x27;: &#x27;/loan/add&#x27;, &#x27;request_data&#x27;: &#x27;{&quot;member_id&quot;:983,&quot;title&quot;:&quot;借钱实现财富自由&quot;,&quot;loan_rate&quot;:12.0,&quot;loan_term&quot;:3,&quot;loan_date_type&quot;:1,&quot;bidding_days&quot;:5}&#x27;, &#x27;extract_data&#x27;: None, &#x27;expected&#x27;: &#x27;{&quot;code&quot;:1,&quot;msg&quot;:&quot;借款金额为空&quot;}&#x27;, &#x27;check_sql&#x27;: None}
+2020-08-07 21:38:51,007 py30 INFO handle_requests.py-33 line：发起一次HTTP请求
+2020-08-07 21:38:51,010 py30 INFO handle_requests.py-41 line：请求头为：{&#x27;X-Lemonban-Media-Type&#x27;: &#x27;lemonban.v3&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json&#x27;, &#x27;Authorization&#x27;: &#x27;Bearer eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwIjoxNTk2ODA3ODMxfQ.mmXatd-bdN5Ox7ajYc9RcBFJpwf-FJMPV5wiGmqExsOpLTEVRWyYyMTVenIFop9mRhqhpcusJuuc1U56CeO_ig&#x27;}
+2020-08-07 21:38:51,010 py30 INFO handle_requests.py-42 line：请求方法为：post
+2020-08-07 21:38:51,010 py30 INFO handle_requests.py-43 line：请求url为：http://api.lemonban.com/futureloan/loan/add
+2020-08-07 21:38:51,011 py30 INFO handle_requests.py-44 line：请求数据为：{&#x27;member_id&#x27;: 983, &#x27;title&#x27;: &#x27;借钱实现财富自由&#x27;, &#x27;loan_rate&#x27;: 12.0, &#x27;loan_term&#x27;: 3, &#x27;loan_date_type&#x27;: 1, &#x27;bidding_days&#x27;: 5, &#x27;sign&#x27;: &#x27;YWrw/q8mL5IoGy0zh/SzaxiKxaMP/gJLCVmFumY9I+/wQogMMcCVKn/V95m6so9EKd67UexqVee4yn5CsODn8SaT1w9qlFcO9YX1cwlJxdxYAuy6xT5WeJ/1EfcsRGgfguaxtxigb+tolmzwdPM6fMIE9AMRSlZaZG0p3np/4oU=&#x27;, &#x27;timestamp&#x27;: 1596807531}
+2020-08-07 21:38:51,073 py30 INFO handle_requests.py-51 line：响应状态码为：200
+2020-08-07 21:38:51,075 py30 INFO handle_requests.py-52 line：响应数据为：{&#x27;code&#x27;: 1, &#x27;msg&#x27;: &#x27;借款金额为空&#x27;, &#x27;data&#x27;: None, &#x27;copyright&#x27;: &#x27;Copyright 柠檬班 © 2017-2020 湖南省零檬信息技术有限公司 All Rights Reserved&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_add.py::TestAdd::test_add[case5]</td>
+          <td class="col-duration">0.07</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>983
+eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwI1596807531
+<br/> ------------------------------Captured stderr call------------------------------ <br/>2020-08-07 21:38:51,100 py30 INFO handle_data.py-44 line：正则表达式替换完成之后的请求数据：
+{&#x27;case_id&#x27;: 5, &#x27;type&#x27;: &#x27;case&#x27;, &#x27;interface&#x27;: &#x27;add&#x27;, &#x27;title&#x27;: &#x27;加标失败—年利率为空&#x27;, &#x27;method&#x27;: &#x27;post&#x27;, &#x27;url&#x27;: &#x27;/loan/add&#x27;, &#x27;request_data&#x27;: &#x27;{&quot;member_id&quot;:983,&quot;title&quot;:&quot;借钱实现财富自由&quot;,&quot;amount&quot;:2000,&quot;loan_term&quot;:3,&quot;loan_date_type&quot;:1,&quot;bidding_days&quot;:5}&#x27;, &#x27;extract_data&#x27;: None, &#x27;expected&#x27;: &#x27;{&quot;code&quot;:1,&quot;msg&quot;:&quot;利率为空&quot;}&#x27;, &#x27;check_sql&#x27;: None}
+2020-08-07 21:38:51,100 py30 INFO handle_requests.py-33 line：发起一次HTTP请求
+2020-08-07 21:38:51,101 py30 INFO handle_requests.py-41 line：请求头为：{&#x27;X-Lemonban-Media-Type&#x27;: &#x27;lemonban.v3&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json&#x27;, &#x27;Authorization&#x27;: &#x27;Bearer eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwIjoxNTk2ODA3ODMxfQ.mmXatd-bdN5Ox7ajYc9RcBFJpwf-FJMPV5wiGmqExsOpLTEVRWyYyMTVenIFop9mRhqhpcusJuuc1U56CeO_ig&#x27;}
+2020-08-07 21:38:51,101 py30 INFO handle_requests.py-42 line：请求方法为：post
+2020-08-07 21:38:51,101 py30 INFO handle_requests.py-43 line：请求url为：http://api.lemonban.com/futureloan/loan/add
+2020-08-07 21:38:51,101 py30 INFO handle_requests.py-44 line：请求数据为：{&#x27;member_id&#x27;: 983, &#x27;title&#x27;: &#x27;借钱实现财富自由&#x27;, &#x27;amount&#x27;: 2000, &#x27;loan_term&#x27;: 3, &#x27;loan_date_type&#x27;: 1, &#x27;bidding_days&#x27;: 5, &#x27;sign&#x27;: &#x27;hluaNN4qqgbO8xOdUnAFOdfTkqEvTSdtZ/1jWkT3ItE81S8VA6leYKXPkPqFt8gPrAn4GDKS0x4zpK2qwxKJFaun7fMdnPAXkM7tttYycAIssWlkxj+WOXcdhxPojPlnDIpn5Dr3duAoxGVjlkQmqHXmfUXzpsu88vuqfaUMDPM=&#x27;, &#x27;timestamp&#x27;: 1596807531}
+2020-08-07 21:38:51,163 py30 INFO handle_requests.py-51 line：响应状态码为：200
+2020-08-07 21:38:51,164 py30 INFO handle_requests.py-52 line：响应数据为：{&#x27;code&#x27;: 1, &#x27;msg&#x27;: &#x27;利率为空&#x27;, &#x27;data&#x27;: None, &#x27;copyright&#x27;: &#x27;Copyright 柠檬班 © 2017-2020 湖南省零檬信息技术有限公司 All Rights Reserved&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_add.py::TestAdd::test_add[case6]</td>
+          <td class="col-duration">0.07</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>983
+eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwI1596807531
+<br/> ------------------------------Captured stderr call------------------------------ <br/>2020-08-07 21:38:51,182 py30 INFO handle_data.py-44 line：正则表达式替换完成之后的请求数据：
+{&#x27;case_id&#x27;: 6, &#x27;type&#x27;: &#x27;case&#x27;, &#x27;interface&#x27;: &#x27;add&#x27;, &#x27;title&#x27;: &#x27;加标失败—借款期限为空&#x27;, &#x27;method&#x27;: &#x27;post&#x27;, &#x27;url&#x27;: &#x27;/loan/add&#x27;, &#x27;request_data&#x27;: &#x27;{&quot;member_id&quot;:983,&quot;title&quot;:&quot;借钱实现财富自由&quot;,&quot;amount&quot;:2000,&quot;loan_rate&quot;:12.0,&quot;loan_date_type&quot;:1,&quot;bidding_days&quot;:5}&#x27;, &#x27;extract_data&#x27;: None, &#x27;expected&#x27;: &#x27;{&quot;code&quot;:1,&quot;msg&quot;:&quot;借款期限为空&quot;}&#x27;, &#x27;check_sql&#x27;: None}
+2020-08-07 21:38:51,182 py30 INFO handle_requests.py-33 line：发起一次HTTP请求
+2020-08-07 21:38:51,183 py30 INFO handle_requests.py-41 line：请求头为：{&#x27;X-Lemonban-Media-Type&#x27;: &#x27;lemonban.v3&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json&#x27;, &#x27;Authorization&#x27;: &#x27;Bearer eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwIjoxNTk2ODA3ODMxfQ.mmXatd-bdN5Ox7ajYc9RcBFJpwf-FJMPV5wiGmqExsOpLTEVRWyYyMTVenIFop9mRhqhpcusJuuc1U56CeO_ig&#x27;}
+2020-08-07 21:38:51,183 py30 INFO handle_requests.py-42 line：请求方法为：post
+2020-08-07 21:38:51,184 py30 INFO handle_requests.py-43 line：请求url为：http://api.lemonban.com/futureloan/loan/add
+2020-08-07 21:38:51,184 py30 INFO handle_requests.py-44 line：请求数据为：{&#x27;member_id&#x27;: 983, &#x27;title&#x27;: &#x27;借钱实现财富自由&#x27;, &#x27;amount&#x27;: 2000, &#x27;loan_rate&#x27;: 12.0, &#x27;loan_date_type&#x27;: 1, &#x27;bidding_days&#x27;: 5, &#x27;sign&#x27;: &#x27;VJg3iY5mFV8Z/+X7zya8faNtxiiOwn7k6m0/cSyVFfIGgvkgXYdEkrnlSDaT9aZ40518H8BFwdsfNUwX9/407FzgWrKIT5sJNSV5M0o4m6SZYK3yjOPmLcvdqlY/iv29CKm5Q3m208bcFu4AD8IS/F0w8AVCMiiL7mC3TRS4cTE=&#x27;, &#x27;timestamp&#x27;: 1596807531}
+2020-08-07 21:38:51,245 py30 INFO handle_requests.py-51 line：响应状态码为：200
+2020-08-07 21:38:51,245 py30 INFO handle_requests.py-52 line：响应数据为：{&#x27;code&#x27;: 1, &#x27;msg&#x27;: &#x27;借款期限为空&#x27;, &#x27;data&#x27;: None, &#x27;copyright&#x27;: &#x27;Copyright 柠檬班 © 2017-2020 湖南省零檬信息技术有限公司 All Rights Reserved&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_add.py::TestAdd::test_add[case7]</td>
+          <td class="col-duration">0.07</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>983
+eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwI1596807531
+<br/> ------------------------------Captured stderr call------------------------------ <br/>2020-08-07 21:38:51,252 py30 INFO handle_data.py-44 line：正则表达式替换完成之后的请求数据：
+{&#x27;case_id&#x27;: 7, &#x27;type&#x27;: &#x27;case&#x27;, &#x27;interface&#x27;: &#x27;add&#x27;, &#x27;title&#x27;: &#x27;加标失败—借款期限类型为空&#x27;, &#x27;method&#x27;: &#x27;post&#x27;, &#x27;url&#x27;: &#x27;/loan/add&#x27;, &#x27;request_data&#x27;: &#x27;{&quot;member_id&quot;:983,&quot;title&quot;:&quot;借钱实现财富自由&quot;,&quot;amount&quot;:2000,&quot;loan_rate&quot;:12.0,&quot;loan_term&quot;:3,&quot;bidding_days&quot;:5}&#x27;, &#x27;extract_data&#x27;: None, &#x27;expected&#x27;: &#x27;{&quot;code&quot;:1,&quot;msg&quot;:&quot;借款日期类型为空&quot;}&#x27;, &#x27;check_sql&#x27;: None}
+2020-08-07 21:38:51,252 py30 INFO handle_requests.py-33 line：发起一次HTTP请求
+2020-08-07 21:38:51,253 py30 INFO handle_requests.py-41 line：请求头为：{&#x27;X-Lemonban-Media-Type&#x27;: &#x27;lemonban.v3&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json&#x27;, &#x27;Authorization&#x27;: &#x27;Bearer eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwIjoxNTk2ODA3ODMxfQ.mmXatd-bdN5Ox7ajYc9RcBFJpwf-FJMPV5wiGmqExsOpLTEVRWyYyMTVenIFop9mRhqhpcusJuuc1U56CeO_ig&#x27;}
+2020-08-07 21:38:51,254 py30 INFO handle_requests.py-42 line：请求方法为：post
+2020-08-07 21:38:51,254 py30 INFO handle_requests.py-43 line：请求url为：http://api.lemonban.com/futureloan/loan/add
+2020-08-07 21:38:51,254 py30 INFO handle_requests.py-44 line：请求数据为：{&#x27;member_id&#x27;: 983, &#x27;title&#x27;: &#x27;借钱实现财富自由&#x27;, &#x27;amount&#x27;: 2000, &#x27;loan_rate&#x27;: 12.0, &#x27;loan_term&#x27;: 3, &#x27;bidding_days&#x27;: 5, &#x27;sign&#x27;: &#x27;n9XMBkxvdqfG66V40zqHcY/dCgUIcI+aszff6Od1OlAb2xO/H09iQrHk13JNCF6+iALNJSuDcQpxmLULjkEQKmH4i6qV0Zj+pVgFykdra+Jmhj0nEoWXfVi29nSh7DArjQHAXULHEnu4eaoQh1oIaql76CQ3WbZii/4628egBms=&#x27;, &#x27;timestamp&#x27;: 1596807531}
+2020-08-07 21:38:51,322 py30 INFO handle_requests.py-51 line：响应状态码为：200
+2020-08-07 21:38:51,322 py30 INFO handle_requests.py-52 line：响应数据为：{&#x27;code&#x27;: 1, &#x27;msg&#x27;: &#x27;借款日期类型为空&#x27;, &#x27;data&#x27;: None, &#x27;copyright&#x27;: &#x27;Copyright 柠檬班 © 2017-2020 湖南省零檬信息技术有限公司 All Rights Reserved&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_add.py::TestAdd::test_add[case8]</td>
+          <td class="col-duration">0.06</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>983
+eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwI1596807531
+<br/> ------------------------------Captured stderr call------------------------------ <br/>2020-08-07 21:38:51,326 py30 INFO handle_data.py-44 line：正则表达式替换完成之后的请求数据：
+{&#x27;case_id&#x27;: 8, &#x27;type&#x27;: &#x27;case&#x27;, &#x27;interface&#x27;: &#x27;add&#x27;, &#x27;title&#x27;: &#x27;加标失败—竞标天数为空&#x27;, &#x27;method&#x27;: &#x27;post&#x27;, &#x27;url&#x27;: &#x27;/loan/add&#x27;, &#x27;request_data&#x27;: &#x27;{&quot;member_id&quot;:983,&quot;title&quot;:&quot;借钱实现财富自由&quot;,&quot;amount&quot;:2000,&quot;loan_rate&quot;:12.0,&quot;loan_term&quot;:3,&quot;loan_date_type&quot;:1}&#x27;, &#x27;extract_data&#x27;: None, &#x27;expected&#x27;: &#x27;{&quot;code&quot;:1,&quot;msg&quot;:&quot;竞标期限为空&quot;}&#x27;, &#x27;check_sql&#x27;: None}
+2020-08-07 21:38:51,326 py30 INFO handle_requests.py-33 line：发起一次HTTP请求
+2020-08-07 21:38:51,327 py30 INFO handle_requests.py-41 line：请求头为：{&#x27;X-Lemonban-Media-Type&#x27;: &#x27;lemonban.v3&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json&#x27;, &#x27;Authorization&#x27;: &#x27;Bearer eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwIjoxNTk2ODA3ODMxfQ.mmXatd-bdN5Ox7ajYc9RcBFJpwf-FJMPV5wiGmqExsOpLTEVRWyYyMTVenIFop9mRhqhpcusJuuc1U56CeO_ig&#x27;}
+2020-08-07 21:38:51,327 py30 INFO handle_requests.py-42 line：请求方法为：post
+2020-08-07 21:38:51,327 py30 INFO handle_requests.py-43 line：请求url为：http://api.lemonban.com/futureloan/loan/add
+2020-08-07 21:38:51,327 py30 INFO handle_requests.py-44 line：请求数据为：{&#x27;member_id&#x27;: 983, &#x27;title&#x27;: &#x27;借钱实现财富自由&#x27;, &#x27;amount&#x27;: 2000, &#x27;loan_rate&#x27;: 12.0, &#x27;loan_term&#x27;: 3, &#x27;loan_date_type&#x27;: 1, &#x27;sign&#x27;: &#x27;HW09d84z/ry1MP9CcCFxp43DEGbMAsm9eWxQ3TZcuQuQ5t4oQSOzUCAbvHjFpTU/tZFc/e+OSYos6x8iu4c8oQByuLQxbXn7Itk6eWdmxmpap90TRSth6wRp0Zz9bF6nE7WQn2AOG4YB73ezQv0W7O5LiZvno+aO87Jlf4XzSAc=&#x27;, &#x27;timestamp&#x27;: 1596807531}
+2020-08-07 21:38:51,383 py30 INFO handle_requests.py-51 line：响应状态码为：200
+2020-08-07 21:38:51,384 py30 INFO handle_requests.py-52 line：响应数据为：{&#x27;code&#x27;: 1, &#x27;msg&#x27;: &#x27;竞标期限为空&#x27;, &#x27;data&#x27;: None, &#x27;copyright&#x27;: &#x27;Copyright 柠檬班 © 2017-2020 湖南省零檬信息技术有限公司 All Rights Reserved&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_add.py::TestAdd::test_add[case9]</td>
+          <td class="col-duration">0.07</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>983
+eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwI1596807531
+<br/> ------------------------------Captured stderr call------------------------------ <br/>2020-08-07 21:38:51,396 py30 INFO handle_data.py-44 line：正则表达式替换完成之后的请求数据：
+{&#x27;case_id&#x27;: 9, &#x27;type&#x27;: &#x27;case&#x27;, &#x27;interface&#x27;: &#x27;add&#x27;, &#x27;title&#x27;: &#x27;加标失败—借款人id不是当前登录用户&#x27;, &#x27;method&#x27;: &#x27;post&#x27;, &#x27;url&#x27;: &#x27;/loan/add&#x27;, &#x27;request_data&#x27;: &#x27;{&quot;member_id&quot;:983+1,&quot;title&quot;:&quot;借钱实现财富自由&quot;,&quot;amount&quot;:2000,&quot;loan_rate&quot;:12.0,&quot;loan_term&quot;:3,&quot;loan_date_type&quot;:1,&quot;bidding_days&quot;:5}&#x27;, &#x27;extract_data&#x27;: None, &#x27;expected&#x27;: &#x27;{&quot;code&quot;:1007,&quot;msg&quot;:&quot;无权限访问，请检查参数&quot;}&#x27;, &#x27;check_sql&#x27;: None}
+2020-08-07 21:38:51,397 py30 INFO handle_requests.py-33 line：发起一次HTTP请求
+2020-08-07 21:38:51,400 py30 INFO handle_requests.py-41 line：请求头为：{&#x27;X-Lemonban-Media-Type&#x27;: &#x27;lemonban.v3&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json&#x27;, &#x27;Authorization&#x27;: &#x27;Bearer eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwIjoxNTk2ODA3ODMxfQ.mmXatd-bdN5Ox7ajYc9RcBFJpwf-FJMPV5wiGmqExsOpLTEVRWyYyMTVenIFop9mRhqhpcusJuuc1U56CeO_ig&#x27;}
+2020-08-07 21:38:51,401 py30 INFO handle_requests.py-42 line：请求方法为：post
+2020-08-07 21:38:51,401 py30 INFO handle_requests.py-43 line：请求url为：http://api.lemonban.com/futureloan/loan/add
+2020-08-07 21:38:51,401 py30 INFO handle_requests.py-44 line：请求数据为：{&#x27;member_id&#x27;: 984, &#x27;title&#x27;: &#x27;借钱实现财富自由&#x27;, &#x27;amount&#x27;: 2000, &#x27;loan_rate&#x27;: 12.0, &#x27;loan_term&#x27;: 3, &#x27;loan_date_type&#x27;: 1, &#x27;bidding_days&#x27;: 5, &#x27;sign&#x27;: &#x27;jaK3zkVkrMOorYa1LFijrfX3VLAWSWRPx1K5rKRvrMiwKuitr746Ti9YQa9YPoMBZUYRp2FJ9359MT3xmvPxLv7qtqSpJdt4cykASiFn3UlZa7am3vPrDJ8fY929hWx6SpeCPzGZi0PFLI/PviHJI13fVkW6pfqLRSNmuTbM0/w=&#x27;, &#x27;timestamp&#x27;: 1596807531}
+2020-08-07 21:38:51,456 py30 INFO handle_requests.py-51 line：响应状态码为：200
+2020-08-07 21:38:51,456 py30 INFO handle_requests.py-52 line：响应数据为：{&#x27;code&#x27;: 1007, &#x27;msg&#x27;: &#x27;无权限访问，请检查参数&#x27;, &#x27;data&#x27;: None, &#x27;copyright&#x27;: &#x27;Copyright 柠檬班 © 2017-2020 湖南省零檬信息技术有限公司 All Rights Reserved&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_add.py::TestAdd::test_add[case10]</td>
+          <td class="col-duration">0.08</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>983
+eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwI1596807531
+<br/> ------------------------------Captured stderr call------------------------------ <br/>2020-08-07 21:38:51,466 py30 INFO handle_data.py-44 line：正则表达式替换完成之后的请求数据：
+{&#x27;case_id&#x27;: 10, &#x27;type&#x27;: &#x27;case&#x27;, &#x27;interface&#x27;: &#x27;add&#x27;, &#x27;title&#x27;: &#x27;加标失败—借款金额为负数&#x27;, &#x27;method&#x27;: &#x27;post&#x27;, &#x27;url&#x27;: &#x27;/loan/add&#x27;, &#x27;request_data&#x27;: &#x27;{&quot;member_id&quot;:983,&quot;title&quot;:&quot;借钱实现财富自由&quot;,&quot;amount&quot;:-2000,&quot;loan_rate&quot;:12.0,&quot;loan_term&quot;:3,&quot;loan_date_type&quot;:1,&quot;bidding_days&quot;:5}&#x27;, &#x27;extract_data&#x27;: None, &#x27;expected&#x27;: &#x27;{&quot;code&quot;:2,&quot;msg&quot;:&quot;借款金额范围错误&quot;}&#x27;, &#x27;check_sql&#x27;: None}
+2020-08-07 21:38:51,467 py30 INFO handle_requests.py-33 line：发起一次HTTP请求
+2020-08-07 21:38:51,468 py30 INFO handle_requests.py-41 line：请求头为：{&#x27;X-Lemonban-Media-Type&#x27;: &#x27;lemonban.v3&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json&#x27;, &#x27;Authorization&#x27;: &#x27;Bearer eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwIjoxNTk2ODA3ODMxfQ.mmXatd-bdN5Ox7ajYc9RcBFJpwf-FJMPV5wiGmqExsOpLTEVRWyYyMTVenIFop9mRhqhpcusJuuc1U56CeO_ig&#x27;}
+2020-08-07 21:38:51,468 py30 INFO handle_requests.py-42 line：请求方法为：post
+2020-08-07 21:38:51,469 py30 INFO handle_requests.py-43 line：请求url为：http://api.lemonban.com/futureloan/loan/add
+2020-08-07 21:38:51,469 py30 INFO handle_requests.py-44 line：请求数据为：{&#x27;member_id&#x27;: 983, &#x27;title&#x27;: &#x27;借钱实现财富自由&#x27;, &#x27;amount&#x27;: -2000, &#x27;loan_rate&#x27;: 12.0, &#x27;loan_term&#x27;: 3, &#x27;loan_date_type&#x27;: 1, &#x27;bidding_days&#x27;: 5, &#x27;sign&#x27;: &#x27;PTSIjvVo0bxOPWffPUogCJENZRRiHa8QoP5T0N/3BaolB0WerBbSdMQfW5CFIa8KVHYcN28Pkh8c1I/H//oieVhcqTNBwu5i3/heb5jMtc8DG7G/+1RovsIp/lN3fL4i4Q3Q1/zaymREDPcZpFXRtM7jRyRZwswX2qEkKFyBNto=&#x27;, &#x27;timestamp&#x27;: 1596807531}
+2020-08-07 21:38:51,537 py30 INFO handle_requests.py-51 line：响应状态码为：200
+2020-08-07 21:38:51,538 py30 INFO handle_requests.py-52 line：响应数据为：{&#x27;code&#x27;: 2, &#x27;msg&#x27;: &#x27;借款金额范围错误&#x27;, &#x27;data&#x27;: None, &#x27;copyright&#x27;: &#x27;Copyright 柠檬班 © 2017-2020 湖南省零檬信息技术有限公司 All Rights Reserved&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_add.py::TestAdd::test_add[case11]</td>
+          <td class="col-duration">0.08</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>983
+eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwI1596807531
+<br/> ------------------------------Captured stderr call------------------------------ <br/>2020-08-07 21:38:51,546 py30 INFO handle_data.py-44 line：正则表达式替换完成之后的请求数据：
+{&#x27;case_id&#x27;: 11, &#x27;type&#x27;: &#x27;case&#x27;, &#x27;interface&#x27;: &#x27;add&#x27;, &#x27;title&#x27;: &#x27;加标失败—借款金额为小数&#x27;, &#x27;method&#x27;: &#x27;post&#x27;, &#x27;url&#x27;: &#x27;/loan/add&#x27;, &#x27;request_data&#x27;: &#x27;{&quot;member_id&quot;:983,&quot;title&quot;:&quot;借钱实现财富自由&quot;,&quot;amount&quot;:2000.1,&quot;loan_rate&quot;:12.0,&quot;loan_term&quot;:3,&quot;loan_date_type&quot;:1,&quot;bidding_days&quot;:5}&#x27;, &#x27;extract_data&#x27;: None, &#x27;expected&#x27;: &#x27;{&quot;code&quot;:2,&quot;msg&quot;:&quot;借款金额范围错误&quot;}&#x27;, &#x27;check_sql&#x27;: None}
+2020-08-07 21:38:51,546 py30 INFO handle_requests.py-33 line：发起一次HTTP请求
+2020-08-07 21:38:51,547 py30 INFO handle_requests.py-41 line：请求头为：{&#x27;X-Lemonban-Media-Type&#x27;: &#x27;lemonban.v3&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json&#x27;, &#x27;Authorization&#x27;: &#x27;Bearer eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwIjoxNTk2ODA3ODMxfQ.mmXatd-bdN5Ox7ajYc9RcBFJpwf-FJMPV5wiGmqExsOpLTEVRWyYyMTVenIFop9mRhqhpcusJuuc1U56CeO_ig&#x27;}
+2020-08-07 21:38:51,547 py30 INFO handle_requests.py-42 line：请求方法为：post
+2020-08-07 21:38:51,547 py30 INFO handle_requests.py-43 line：请求url为：http://api.lemonban.com/futureloan/loan/add
+2020-08-07 21:38:51,547 py30 INFO handle_requests.py-44 line：请求数据为：{&#x27;member_id&#x27;: 983, &#x27;title&#x27;: &#x27;借钱实现财富自由&#x27;, &#x27;amount&#x27;: 2000.1, &#x27;loan_rate&#x27;: 12.0, &#x27;loan_term&#x27;: 3, &#x27;loan_date_type&#x27;: 1, &#x27;bidding_days&#x27;: 5, &#x27;sign&#x27;: &#x27;BkHs9C66SXKx6I3Qn7JMs0CDZWJmNlUFErcDTq5UsNTtO+rqIvjtdCR0A1NhotJrhv00Fa7uoQtuWU0OGBd4W3uGt5JTWxYWgZ4gec2TCXfRBiDVLf6MdLsUdrMYGNtrFceGb7mvu1q4oEReQiNNHnCRN/qdrmKyqkbQsdrZQOg=&#x27;, &#x27;timestamp&#x27;: 1596807531}
+2020-08-07 21:38:51,615 py30 INFO handle_requests.py-51 line：响应状态码为：200
+2020-08-07 21:38:51,617 py30 INFO handle_requests.py-52 line：响应数据为：{&#x27;code&#x27;: 2, &#x27;msg&#x27;: &#x27;借款金额范围错误&#x27;, &#x27;data&#x27;: None, &#x27;copyright&#x27;: &#x27;Copyright 柠檬班 © 2017-2020 湖南省零檬信息技术有限公司 All Rights Reserved&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/test_add.py::TestAdd::test_add[case12]</td>
+          <td class="col-duration">0.12</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>18605671115
+123456789
+eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwI1596807531
+<br/> ------------------------------Captured stderr call------------------------------ <br/>2020-08-07 21:38:51,633 py30 INFO handle_data.py-44 line：正则表达式替换完成之后的请求数据：
+{&#x27;case_id&#x27;: None, &#x27;type&#x27;: &#x27;before&#x27;, &#x27;interface&#x27;: &#x27;login&#x27;, &#x27;title&#x27;: &#x27;前置操作 -普通用户登陆&#x27;, &#x27;method&#x27;: &#x27;post&#x27;, &#x27;url&#x27;: &#x27;/member/login&#x27;, &#x27;request_data&#x27;: &#x27;{&quot;mobile_phone&quot;:&quot;18605671115&quot;,&quot;pwd&quot;:&quot;123456789&quot;}&#x27;, &#x27;extract_data&#x27;: &#x27;{&quot;member_id&quot;:&quot;$..id&quot;,&quot;token&quot;:&quot;$..token&quot;}&#x27;, &#x27;expected&#x27;: None, &#x27;check_sql&#x27;: None}
+2020-08-07 21:38:51,634 py30 INFO handle_requests.py-33 line：发起一次HTTP请求
+2020-08-07 21:38:51,635 py30 INFO handle_requests.py-41 line：请求头为：{&#x27;X-Lemonban-Media-Type&#x27;: &#x27;lemonban.v3&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json&#x27;, &#x27;Authorization&#x27;: &#x27;Bearer eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjk4MywiZXhwIjoxNTk2ODA3ODMxfQ.mmXatd-bdN5Ox7ajYc9RcBFJpwf-FJMPV5wiGmqExsOpLTEVRWyYyMTVenIFop9mRhqhpcusJuuc1U56CeO_ig&#x27;}
+2020-08-07 21:38:51,636 py30 INFO handle_requests.py-42 line：请求方法为：post
+2020-08-07 21:38:51,636 py30 INFO handle_requests.py-43 line：请求url为：http://api.lemonban.com/futureloan/member/login
+2020-08-07 21:38:51,636 py30 INFO handle_requests.py-44 line：请求数据为：{&#x27;mobile_phone&#x27;: &#x27;18605671115&#x27;, &#x27;pwd&#x27;: &#x27;123456789&#x27;, &#x27;sign&#x27;: &#x27;rdrNeCpHMAoKUHYUGwgrOO9htfbfr8xzkHfPTjlbCIwod2GaZCjlCgSVyNYS+h31es1ymKDT/ZL+wUNFOf6GC//Uu+QWy9JOXTTc1zyYM+zNSnxrYq/qVqwlZxe4ddBVPwwsgkZoxLRlOWMCtT3n/Lrqe7itjKMQO+BOrS9WEsY=&#x27;, &#x27;timestamp&#x27;: 1596807531}
+2020-08-07 21:38:51,744 py30 INFO handle_requests.py-51 line：响应状态码为：200
+2020-08-07 21:38:51,745 py30 INFO handle_requests.py-52 line：响应数据为：{&#x27;code&#x27;: 0, &#x27;msg&#x27;: &#x27;OK&#x27;, &#x27;data&#x27;: {&#x27;id&#x27;: 101, &#x27;leave_amount&#x27;: 55357172.41, &#x27;mobile_phone&#x27;: &#x27;18605671115&#x27;, &#x27;reg_name&#x27;: &#x27;萌萌1&#x27;, &#x27;reg_time&#x27;: &#x27;2020-07-16 14:26:40.0&#x27;, &#x27;type&#x27;: 1, &#x27;token_info&#x27;: {&#x27;token_type&#x27;: &#x27;Bearer&#x27;, &#x27;expires_in&#x27;: &#x27;2020-08-07 21:43:52&#x27;, &#x27;token&#x27;: &#x27;eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjEwMSwiZXhwIjoxNTk2ODA3ODMyfQ.e5wCUmx6lMQtas7JLRXAA28jM9-ikyjrOxfnCYvDHlrwrBYpH63Dh3fuxG2tDtsXjaWEBXY24_0JaAPRgqqv9Q&#x27;}}, &#x27;copyright&#x27;: &#x27;Copyright 柠檬班 © 2017-2020 湖南省零檬信息技术有限公司 All Rights Reserved&#x27;}
+2020-08-07 21:38:51,745 py30 INFO handle_extract_data_from_response.py-23 line：要从响应结果当中提取的数据集为：
+{&#x27;member_id&#x27;: &#x27;$..id&#x27;, &#x27;token&#x27;: &#x27;$..token&#x27;}
+2020-08-07 21:38:51,746 py30 INFO handle_extract_data_from_response.py-29 line：设置环境变量.key:member_id,value:101
+2020-08-07 21:38:51,746 py30 INFO handle_extract_data_from_response.py-29 line：设置环境变量.key:token,value:eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjEwMSwiZXhwIjoxNTk2ODA3ODMyfQ.e5wCUmx6lMQtas7JLRXAA28jM9-ikyjrOxfnCYvDHlrwrBYpH63Dh3fuxG2tDtsXjaWEBXY24_0JaAPRgqqv9Q
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/TestCases_Business/test_user_business.py::TestUserBusiness::test_user_business_1</td>
+          <td class="col-duration">0.12</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>13709663737
+<br/> ------------------------------Captured stderr call------------------------------ <br/>2020-08-07 21:38:51,963 py30 INFO handle_data.py-44 line：正则表达式替换完成之后的请求数据：
+{&#x27;id&#x27;: 1, &#x27;title&#x27;: &#x27;注册&#x27;, &#x27;method&#x27;: &#x27;post&#x27;, &#x27;url&#x27;: &#x27;/member/register&#x27;, &#x27;request_data&#x27;: &#x27;{&quot;mobile_phone&quot;:&quot;13709663737&quot;,&quot;pwd&quot;:&quot;123456789&quot;,&quot;type&quot;:0,&quot;reg_name&quot;:&quot;美丽可爱的小简&quot;}&#x27;, &#x27;extract_data&#x27;: None}
+2020-08-07 21:38:51,963 py30 INFO handle_requests.py-33 line：发起一次HTTP请求
+2020-08-07 21:38:51,964 py30 INFO handle_requests.py-41 line：请求头为：{&#x27;X-Lemonban-Media-Type&#x27;: &#x27;lemonban.v3&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json&#x27;}
+2020-08-07 21:38:51,965 py30 INFO handle_requests.py-42 line：请求方法为：post
+2020-08-07 21:38:51,965 py30 INFO handle_requests.py-43 line：请求url为：http://api.lemonban.com/futureloan/member/register
+2020-08-07 21:38:51,965 py30 INFO handle_requests.py-44 line：请求数据为：{&#x27;mobile_phone&#x27;: &#x27;13709663737&#x27;, &#x27;pwd&#x27;: &#x27;123456789&#x27;, &#x27;type&#x27;: 0, &#x27;reg_name&#x27;: &#x27;美丽可爱的小简&#x27;}
+2020-08-07 21:38:52,080 py30 INFO handle_requests.py-51 line：响应状态码为：200
+2020-08-07 21:38:52,080 py30 INFO handle_requests.py-52 line：响应数据为：{&#x27;code&#x27;: 0, &#x27;msg&#x27;: &#x27;OK&#x27;, &#x27;data&#x27;: {&#x27;id&#x27;: 2071348, &#x27;reg_name&#x27;: &#x27;美丽可爱的小简&#x27;, &#x27;mobile_phone&#x27;: &#x27;13709663737&#x27;}, &#x27;copyright&#x27;: &#x27;Copyright 柠檬班 © 2017-2020 湖南省零檬信息技术有限公司 All Rights Reserved&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/TestCases_Business/test_user_business.py::TestUserBusiness::test_user_business_2</td>
+          <td class="col-duration">0.10</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>13709663737
+<br/> ------------------------------Captured stderr call------------------------------ <br/>2020-08-07 21:38:52,084 py30 INFO handle_data.py-44 line：正则表达式替换完成之后的请求数据：
+{&#x27;id&#x27;: 2, &#x27;title&#x27;: &#x27;登录&#x27;, &#x27;method&#x27;: &#x27;post&#x27;, &#x27;url&#x27;: &#x27;/member/login&#x27;, &#x27;request_data&#x27;: &#x27;{&quot;mobile_phone&quot;:&quot;13709663737&quot;,&quot;pwd&quot;:&quot;123456789&quot;}&#x27;, &#x27;extract_data&#x27;: &#x27;{&quot;member_id&quot;:&quot;$..id&quot;,&quot;token&quot;:&quot;$..token&quot;}&#x27;}
+2020-08-07 21:38:52,084 py30 INFO handle_requests.py-33 line：发起一次HTTP请求
+2020-08-07 21:38:52,084 py30 INFO handle_requests.py-41 line：请求头为：{&#x27;X-Lemonban-Media-Type&#x27;: &#x27;lemonban.v3&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json&#x27;}
+2020-08-07 21:38:52,084 py30 INFO handle_requests.py-42 line：请求方法为：post
+2020-08-07 21:38:52,084 py30 INFO handle_requests.py-43 line：请求url为：http://api.lemonban.com/futureloan/member/login
+2020-08-07 21:38:52,084 py30 INFO handle_requests.py-44 line：请求数据为：{&#x27;mobile_phone&#x27;: &#x27;13709663737&#x27;, &#x27;pwd&#x27;: &#x27;123456789&#x27;}
+2020-08-07 21:38:52,185 py30 INFO handle_requests.py-51 line：响应状态码为：200
+2020-08-07 21:38:52,185 py30 INFO handle_requests.py-52 line：响应数据为：{&#x27;code&#x27;: 0, &#x27;msg&#x27;: &#x27;OK&#x27;, &#x27;data&#x27;: {&#x27;id&#x27;: 2071348, &#x27;leave_amount&#x27;: 0.0, &#x27;mobile_phone&#x27;: &#x27;13709663737&#x27;, &#x27;reg_name&#x27;: &#x27;美丽可爱的小简&#x27;, &#x27;reg_time&#x27;: &#x27;2020-08-07 21:38:52.0&#x27;, &#x27;type&#x27;: 0, &#x27;token_info&#x27;: {&#x27;token_type&#x27;: &#x27;Bearer&#x27;, &#x27;expires_in&#x27;: &#x27;2020-08-07 21:43:52&#x27;, &#x27;token&#x27;: &#x27;eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjIwNzEzNDgsImV4cCI6MTU5NjgwNzgzMn0.FZqWU5KBWzO-sY9nDKZ5IxuUWGnRKQAOpnvvXOeuENVPz13bHqBJZC8yWdcDkg0KpakHyzBU6AFIsgzT3b-JWQ&#x27;}}, &#x27;copyright&#x27;: &#x27;Copyright 柠檬班 © 2017-2020 湖南省零檬信息技术有限公司 All Rights Reserved&#x27;}
+2020-08-07 21:38:52,185 py30 INFO handle_extract_data_from_response.py-23 line：要从响应结果当中提取的数据集为：
+{&#x27;member_id&#x27;: &#x27;$..id&#x27;, &#x27;token&#x27;: &#x27;$..token&#x27;}
+2020-08-07 21:38:52,186 py30 INFO handle_extract_data_from_response.py-29 line：设置环境变量.key:member_id,value:2071348
+2020-08-07 21:38:52,186 py30 INFO handle_extract_data_from_response.py-29 line：设置环境变量.key:token,value:eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjIwNzEzNDgsImV4cCI6MTU5NjgwNzgzMn0.FZqWU5KBWzO-sY9nDKZ5IxuUWGnRKQAOpnvvXOeuENVPz13bHqBJZC8yWdcDkg0KpakHyzBU6AFIsgzT3b-JWQ
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCases/TestCases_Business/test_user_business.py::TestUserBusiness::test_user_business_3</td>
+          <td class="col-duration">0.08</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>2071348
+eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjIwNzEzNDgsI1596807532
+<br/> ------------------------------Captured stderr call------------------------------ <br/>2020-08-07 21:38:52,193 py30 INFO handle_data.py-44 line：正则表达式替换完成之后的请求数据：
+{&#x27;id&#x27;: 3, &#x27;title&#x27;: &#x27;充值&#x27;, &#x27;method&#x27;: &#x27;post&#x27;, &#x27;url&#x27;: &#x27;member/recharge&#x27;, &#x27;request_data&#x27;: &#x27;{&quot;member_id&quot;: 2071348,&quot;amount&quot;:600}&#x27;, &#x27;extract_data&#x27;: None}
+2020-08-07 21:38:52,193 py30 INFO handle_requests.py-33 line：发起一次HTTP请求
+2020-08-07 21:38:52,194 py30 INFO handle_requests.py-41 line：请求头为：{&#x27;X-Lemonban-Media-Type&#x27;: &#x27;lemonban.v3&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json&#x27;, &#x27;Authorization&#x27;: &#x27;Bearer eyJhbGciOiJIUzUxMiJ9.eyJtZW1iZXJfaWQiOjIwNzEzNDgsImV4cCI6MTU5NjgwNzgzMn0.FZqWU5KBWzO-sY9nDKZ5IxuUWGnRKQAOpnvvXOeuENVPz13bHqBJZC8yWdcDkg0KpakHyzBU6AFIsgzT3b-JWQ&#x27;}
+2020-08-07 21:38:52,194 py30 INFO handle_requests.py-42 line：请求方法为：post
+2020-08-07 21:38:52,194 py30 INFO handle_requests.py-43 line：请求url为：http://api.lemonban.com/futureloan/member/recharge
+2020-08-07 21:38:52,194 py30 INFO handle_requests.py-44 line：请求数据为：{&#x27;member_id&#x27;: 2071348, &#x27;amount&#x27;: 600, &#x27;sign&#x27;: &#x27;M7bS8YakEIlfwKAPssbWwg1FlaVsNPDyDCtGjgs05drihZe4MDF/JDKt1FFR5iwwOVTgXGn65Bn0vvMAw+TJ7EH+e4SiU60B4EI3jGT+KUn5yCNDBn/r4QBzE9NDuGiRXjyNuyBOGOlWCWtjjjG566m9ziBGZqmq8Vgh35XfcoI=&#x27;, &#x27;timestamp&#x27;: 1596807532}
+2020-08-07 21:38:52,252 py30 INFO handle_requests.py-51 line：响应状态码为：200
+2020-08-07 21:38:52,253 py30 INFO handle_requests.py-52 line：响应数据为：{&#x27;code&#x27;: 0, &#x27;msg&#x27;: &#x27;OK&#x27;, &#x27;data&#x27;: {&#x27;id&#x27;: 2071348, &#x27;leave_amount&#x27;: 600.0, &#x27;mobile_phone&#x27;: &#x27;13709663737&#x27;, &#x27;reg_name&#x27;: &#x27;美丽可爱的小简&#x27;, &#x27;reg_time&#x27;: &#x27;2020-08-07 21:38:52.0&#x27;, &#x27;type&#x27;: 0}, &#x27;copyright&#x27;: &#x27;Copyright 柠檬班 © 2017-2020 湖南省零檬信息技术有限公司 All Rights Reserved&#x27;}
+<br/></div></td></tr></tbody></table></body></html>

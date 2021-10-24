@@ -1,0 +1,57 @@
+前置后置：
+   unittest:
+          setup/teardown
+          setup当中得到的变量，怎么传递给测试用例的：self.XXX = value
+          setupClass,tearDownClass
+          setupClass当中得到的变量，怎么传递给测试用例的：cls.XXX = value
+
+fixture:
+
+    先定义再调用。
+
+    定义：
+    1、函数实现的，函数名称不固定。 --- 如何知道它是前置后置？
+       @pytest.fixture
+       def fix():
+        pass
+
+    2、前置操作和后置操作，写在一个函数里。 -- 怎么区分哪些是前置代码？后置代码？
+       @pytest.fixture
+       def fix():
+        前置代码
+        yeild  # 分隔线
+        后置代码
+
+    3、4个作用域。测试函数(function)、测试类(class)、测试模块文件(module)、测试会话(session)
+        @pytest.fixture(scope=function(默认值)/class/module/session)
+           def fix():
+            前置代码
+            yeild  # 分隔线
+            后置代码
+
+    4、不跟测试类/测试函数放在一起。   ---如果说有测试类要用的话，怎么办？需要的时候再调用。
+
+
+    5、前置操作得到的一些数据，如何传递给测试用例？
+      yeild 返回值
+
+      在测试用例当中：以fixture函数名作为用例参数。用例参数接收返回值。
+      测试函数的参数：1、fixture   2、参数化
+
+
+
+    5、共享机制：conftest.py
+       conftest.py   定义fixture,可以定义多个。
+
+
+
+调用：
+  用例/类 主动调用 fixtures.
+
+  哪儿需要哪儿调：
+
+  @pytest.mark.usefixtures("fixture的函数名称")
+  测试类/测试函数
+
+  如果fixture有返回值，
+  那么，将它作为测试函数的参数时，则可以不用使用： @pytest.mark.usefixtures("fixture的函数名称")

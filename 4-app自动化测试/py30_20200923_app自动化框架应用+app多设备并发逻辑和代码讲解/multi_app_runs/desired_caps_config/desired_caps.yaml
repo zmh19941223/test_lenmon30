@@ -1,0 +1,9 @@
+platformName: Android
+appPackage: com.lemon.lemonban
+appActivity: com.lemon.lemonban.activity.WelcomeActivity
+noReset: True
+unicodeKeyboard: True
+
+
+# platformVersion: 动态获取
+# deviceName: 动态获取

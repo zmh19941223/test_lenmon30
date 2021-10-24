@@ -1,0 +1,90 @@
+unittest
+  -- 写用例 - TestCase
+  -- 收集用例 -TestLoader.discover()
+  -- 生成报告 -HtmlTestRunner
+  -- 模板
+pytest
+  -- 能够运行unittest用例
+  -- 灵活
+
+nose
+behave - 行为驱动
+
+共同点：
+  1、测试框架 - 通过python代码来编写测试用例、收集用例、运行用例、生成报告。
+
+
+pytest安装：
+        pip install pytest
+
+1、编写用例上：
+   unitest： 继承TestCase
+   pytest： 函数/类里面的方法 -- 用例名称必须以test_开头。如果用例在类当中，类名必须以Test开头。
+
+   前置后置：
+   unittest: setup/teardown   setupClass,tearDownClass
+   pytest:
+        方案一：沿用了unittest的风格。
+              1、用例级别：setup,teardown   -- 类和类外的用例都可以使用
+              2、类级别：setup_class   teardown_class  --- 类用
+                 @classmethod
+                def setup_class(cls):
+                    print(" 类 -- 前置 --")
+              3、模块级别：setup_module   teardown_module
+
+        方案二：fixture
+
+   断言：
+   unittest: self.assertXXXXX()
+   pytest: assert 表达式
+
+2、收集用例和运行用例：
+   用例分散在多个文件当中。
+   unittest: TestLoader.discover(目录) - 收集到套件当中。run方法去执行。
+   pytest:
+       不需要写任何代码去收集用例 - 自动收集/发现用例的方式。
+       执行用例的时候会自动收集：
+       pytest命令行：pytest [参数]
+
+   如何自动收集用例的？
+   1、目录 - 从哪个目录下开始搜索用例。
+      rootdir: pytest命令在哪个目录下运行，就以哪个目录为rootdir.
+   2、文件名 - 命名符合test_*.py或者*_test.py条件的文件名，它里边儿是会有用例。
+   3、函数/类下方法 - 函数名以test_开头
+                 - 以Test开头(不含__init__)的类下的test_开头方法
+
+   收集并运行用例：
+   方式一：
+    命令行：pytest -s -v  控制台显示详细的用例执行情况
+   方式二：
+    python文件：pytest.main([命令行参数])
+
+   执行顺序？？？：
+   1、文件名：ASCII
+   2、文件内部：按代码先后顺序
+
+
+3、生成测试报告：
+   unittest: HtmlTestRunner、BeautifulReport
+   pytest: html-插件
+           html插安装命令：pip install pytest-html
+
+           allure-插件
+        有非常多的插件。allure-插件  重运行-插件
+        安装命令：pip install allure-pytest
+        allure命令行工具下载地址：https://repo.maven.apache.org/maven2/io/qameta/allure/allure-commandline/
+
+
+官方文档：https://docs.pytest.org/en/stable/
+pytest+allure集成：https://www.cnblogs.com/Simple-Small/p/11512337.html
+pytest文章：https://www.cnblogs.com/Simple-Small/tag/pytest/
+
+下节课：
+  fixture -
+
+本节总结：
+    1、pytest - 写用例、收集用例、运行用例、生成报告。
+                写用例：前置后置(??)、步骤、断言(assert)。
+                收集用例：自动收集(目录-文件-用例)
+                执行用例：pytest命令(2种方式)
+                生成报告：html报告-html插件  allure报告-下节？

@@ -1,0 +1,10 @@
+运行环境和流程:
+    1、前提安装好python
+    2、安装flask
+        cmd 执行命令 pip install flask
+    3、运行http_service.py这个文件
+
+    4、就可以通过http://127.0.0.1:5000/upload访问这个接口
+        注意点：get请求返回的是上传文件的页面，post请求是上传文件
+
+

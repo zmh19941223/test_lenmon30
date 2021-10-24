@@ -1,0 +1,16 @@
+1、job 
+2、workspace
+3、plugin
+
+job: 一个任务/项目。 - 创建任务 - 任务配置() - 执行任务 - 任务结果展示
+
+workspace:
+    默认是用来存放job相关的资料、产出资料。比如，jenkins从svn/git上下载的代码，会自动放到job的workspace
+
+plugin:
+   相当于python的第三方库。
+   让jenkins具备更多的功能。
+
+
+ jenkins呈现html报告：
+ 需要在  Manage Jenkins->Script console  执行  System.setProperty("hudson.model.DirectoryBrowserSupport.CSP", "")

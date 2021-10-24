@@ -1,0 +1,19 @@
+UI - user interface
+web网页、客户端(pc,app)
+
+1、pytest --
+
+
+2、selenium -
+   selenium介绍、元素定位、元素操作
+
+   python+selenium:
+   框架 -
+       PageObject模式
+       优化和封装 - selenium二次封装、失败截图、执行过程输出、异常信息输出
+
+
+   selenium原理
+
+
+appium

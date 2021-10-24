@@ -1,0 +1,19 @@
+1、发送http请示到appium server
+2、appium server收到之后，创建session
+3、获取已连接的设备，并找对应的安卓版本号
+
+4、获取io.appium.settings的状态，获取它的版本，以确保是当前匹配最新的版本。settings_apk-debug.apk
+  获取io.appium.uiautomator2.server的状态，获取它的版本，以确保是当前匹配最新的版本。
+     io.appium.uiautomator2.server.test
+
+5、启动手机上的uiautomator.server的服务，然后设置将本地appium server收到的指令都从本地8200端口，转发到设备的6790端口
+
+6、跟手机创建会话。
+
+7、打开app
+
+8、如果60s内，appium server没有收到客户端的http请求，主动关闭与客户端的会话，与手机端的会话。然后关闭app
+
+
+柠檬班文章，关于uiautomator:
+https://www.cnblogs.com/yyoba/p/9675071.html

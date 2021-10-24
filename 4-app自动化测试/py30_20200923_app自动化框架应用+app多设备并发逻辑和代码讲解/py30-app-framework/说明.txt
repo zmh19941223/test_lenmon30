@@ -1,0 +1,4 @@
+启动会话
+web: webdriver.Chrome()
+app: 各种启动参数-字典  - webdriver.Remote()
+     yaml
